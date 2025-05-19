@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Objek Mengorbit dengan Shadow & Lighting - Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+        let plane, cube, sphere, pyramid;
+        let sphereEmissiveMaterial, objectLambertMaterial, planeLambertMaterial;
+
+        // Grup untuk orbit
+        let cubeOrbitGroup, sphereOrbitGroup, pyramidOrbitGroup;
+
+        const texturePath = "texture.jpeg";
+
+        function init() {
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // 2. Camera
+            const fov = 50; // Sesuaikan FOV jika perlu
+            const aspect = window.innerWidth / window.innerHeight;
+            const near = 0.1;
+            const far = 1000;
+            camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+            camera.position.set(0, 7, 15); // Posisi kamera untuk melihat orbit
+            camera.lookAt(0, 1.5, 0);    // Target ke pusat area orbit
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // === KEMBALIKAN SHADOW MAP ===
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // 4. Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 1.5, 0); // Targetkan ke pusat area orbit
+
+            // 5. Texture Loader
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(
+                texturePath,
+                function (loadedTexture) {
+                    console.log("Tekstur BERHASIL dimuat.");
+                    loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+                    loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+                    const commonTextureProps = { needsUpdate: true };
+
+                    sphereEmissiveMaterial = new THREE.MeshBasicMaterial({
+                        map: Object.assign(loadedTexture.clone(), commonTextureProps)
+                    });
+                    if (sphere) sphere.material = sphereEmissiveMaterial;
+
+                    objectLambertMaterial = new THREE.MeshLambertMaterial({
+                        map: Object.assign(loadedTexture.clone(), commonTextureProps),
+                    });
+                    if (cube) cube.material = objectLambertMaterial;
+                    if (pyramid) pyramid.material = objectLambertMaterial;
+
+                    const planeTextureInstance = loadedTexture.clone();
+                    planeTextureInstance.wrapS = THREE.RepeatWrapping;
+                    planeTextureInstance.wrapT = THREE.RepeatWrapping;
+                    planeTextureInstance.repeat.set(12, 12);
+                    Object.assign(planeTextureInstance, commonTextureProps);
+
+                    planeLambertMaterial = new THREE.MeshLambertMaterial({
+                        map: planeTextureInstance,
+                    });
+                    if (plane) plane.material = planeLambertMaterial;
+                    console.log("Material diterapkan.");
+                },
+                (xhr) => console.log(`Tekstur: ${(xhr.loaded / xhr.total * 100)}% loaded`),
+                (error) => console.error("Gagal memuat tekstur:", error)
+            );
+
+            // 6. Geometries, Meshes, and Orbit Groups
+
+            // PLANE (LANTAI) - Statis
+            const planeSize = 25;
+            const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
+            plane = new THREE.Mesh(planeGeometry, new THREE.MeshLambertMaterial({ color: 0x888888, side: THREE.DoubleSide }));
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = 0;
+            plane.receiveShadow = true; // === PLANE MENERIMA BAYANGAN ===
+            scene.add(plane);
+
+            // --- OBJEK MENGORBIT ---
+            const objectYLevel = 2.5; // Ketinggian y untuk pusat orbit objek
+
+            // KUBUS
+            const cubeSideLength = 1.5;
+            const cubeOrbitRadius = 4.5;
+            cubeOrbitGroup = new THREE.Group();
+            cubeOrbitGroup.position.y = objectYLevel; // Atur ketinggian grup orbit
+            scene.add(cubeOrbitGroup);
+
+            const cubeGeometry = new THREE.BoxGeometry(cubeSideLength, cubeSideLength, cubeSideLength);
+            cube = new THREE.Mesh(cubeGeometry, new THREE.MeshLambertMaterial({ color: 0xbbbbbb }));
+            cube.position.set(cubeOrbitRadius, 0, 0); // Posisi relatif terhadap grup (di sumbu x)
+            cube.castShadow = true;    // === KUBUS MELEMPAR BAYANGAN ===
+            cube.receiveShadow = true;
+            cubeOrbitGroup.add(cube); // Tambahkan kubus ke grup orbitnya
+
+            // BOLA (SPHERE)
+            const sphereRadius = 1.3;
+            const sphereOrbitRadius = 3.0;
+            sphereOrbitGroup = new THREE.Group();
+            sphereOrbitGroup.position.y = objectYLevel;
+            scene.add(sphereOrbitGroup);
+
+            const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 64, 32);
+            sphere = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0xff88cc }));
+            sphere.position.set(0, 0, sphereOrbitRadius); // Posisi relatif (misalnya di sumbu z)
+            sphere.castShadow = true;    // === BOLA MELEMPAR BAYANGAN ===
+            sphere.receiveShadow = true;
+            sphereOrbitGroup.add(sphere);
+
+            // PIRAMIDA
+            const pyramidBaseRadius = 1.1;
+            const pyramidHeight = 2.2;
+            const pyramidOrbitRadius = 3.8;
+            pyramidOrbitGroup = new THREE.Group();
+            pyramidOrbitGroup.position.y = objectYLevel;
+            scene.add(pyramidOrbitGroup);
+
+            const pyramidGeometry = new THREE.ConeGeometry(pyramidBaseRadius, pyramidHeight, 4);
+            pyramid = new THREE.Mesh(pyramidGeometry, new THREE.MeshLambertMaterial({ color: 0xbbbbbb }));
+            // Posisi relatif dengan sudut awal berbeda
+            pyramid.position.set(-pyramidOrbitRadius * Math.cos(Math.PI / 4), 0, pyramidOrbitRadius * Math.sin(Math.PI / 4));
+            pyramid.castShadow = true;    // === PIRAMIDA MELEMPAR BAYANGAN ===
+            pyramid.receiveShadow = true;
+            pyramidOrbitGroup.add(pyramid);
+
+
+            // 7. Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const hemisphereLight = new THREE.HemisphereLight(0xaaaaff, 0x443322, 0.4);
+            scene.add(hemisphereLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            directionalLight.position.set(8, 12, 8); // Sesuaikan posisi untuk bayangan yang baik
+            directionalLight.castShadow = true; // === CAHAYA MELEMPAR BAYANGAN ===
+            scene.add(directionalLight);
+
+            // Konfigurasi Shadow Map untuk DirectionalLight
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 40; // Sesuaikan
+            directionalLight.shadow.camera.left = -15; // Sesuaikan dengan area orbit
+            directionalLight.shadow.camera.right = 15;
+            directionalLight.shadow.camera.top = 15;
+            directionalLight.shadow.camera.bottom = -15;
+            directionalLight.shadow.bias = -0.001;
+
+            // Opsional: Helper untuk melihat frustum kamera bayangan
+            // const shadowCamHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
+            // scene.add(shadowCamHelper);
+
+
+            window.addEventListener('resize', onWindowResize, false);
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.0005; // Waktu untuk animasi
+
+            // Orbit untuk kubus (misalnya, berputar pada sumbu Y grupnya)
+            if (cubeOrbitGroup) {
+                cubeOrbitGroup.rotation.y = time * 0.5; // Kecepatan orbit kubus
+                // Anda juga bisa membuat kubusnya berputar pada sumbunya sendiri
+                if (cube) cube.rotation.y = time * 1.2;
+            }
+
+            // Orbit untuk bola (misalnya, berputar pada sumbu X grupnya dengan kecepatan berbeda)
+            if (sphereOrbitGroup) {
+                sphereOrbitGroup.rotation.x = time * -0.3;
+                sphereOrbitGroup.rotation.y = time * 0.4; // Bisa kombinasi rotasi
+                if (sphere) sphere.rotation.y = time * -1.0;
+            }
+
+            // Orbit untuk piramida (misalnya, berputar pada sumbu Y grupnya dengan fase/kecepatan lain)
+            if (pyramidOrbitGroup) {
+                pyramidOrbitGroup.rotation.y = time * 0.25 + Math.PI / 2; // Kecepatan dan offset fase
+                if (pyramid) pyramid.rotation.x = time * 0.8;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+
+</body>
+
+</html>
