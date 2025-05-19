@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Objek Statis dengan Shadow & Lighting - Three.js</title>
+    <title>Objek Statis - Kontrol Terbatas - Three.js</title>
     <style>
         body {
             margin: 0;
@@ -37,13 +37,6 @@
         let plane, cube, sphere, pyramid;
         let cubeEmissiveMaterial, shinyObjectMaterial, planeStandardMaterial;
 
-        // Grup orbit tidak lagi diperlukan jika objek statis,
-        // tapi kita bisa biarkan strukturnya untuk kemudahan jika ingin diubah lagi.
-        // Atau, kita bisa langsung posisikan objek di scene.
-        // Untuk perubahan minimal, saya akan biarkan grup tapi tidak merotasinya.
-        let cubeOrbitGroup, sphereOrbitGroup, pyramidOrbitGroup;
-
-
         const texturePath = "texture.jpeg";
 
         function init() {
@@ -67,11 +60,26 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            // 4. Controls
+            // 4. Controls (MODIFIKASI DI SINI)
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.target.set(0, 1.5, 0);
+
+            // Menonaktifkan Panning (biasanya klik kanan atau tengah)
+            controls.enablePan = false;
+
+            // Opsional: Jika Anda ingin lebih spesifik dengan tombol mouse
+            // controls.mouseButtons = {
+            //  LEFT: THREE.MOUSE.ROTATE,   // Klik kiri untuk rotasi
+            //  MIDDLE: THREE.MOUSE.DOLLY,  // Tombol tengah untuk zoom (jika ada)
+            //  RIGHT: null                 // Klik kanan tidak melakukan apa-apa
+            //                               // atau bisa juga: RIGHT: THREE.MOUSE.ROTATE jika ingin klik kanan juga rotasi
+            // };
+
+            // Jika Anda juga ingin menonaktifkan zoom dengan scroll wheel:
+            // controls.enableZoom = false;
+
 
             // 5. Texture Loader
             const textureLoader = new THREE.TextureLoader();
@@ -90,8 +98,8 @@
 
                     shinyObjectMaterial = new THREE.MeshStandardMaterial({
                         map: Object.assign(loadedTexture.clone(), commonTextureProps),
-                        metalness: 0.5,
-                        roughness: 0.5,
+                        metalness: 0.5, // Disesuaikan dari kode Anda sebelumnya
+                        roughness: 0.5, // Disesuaikan dari kode Anda sebelumnya
                     });
                     if (sphere) sphere.material = shinyObjectMaterial;
                     if (pyramid) pyramid.material = shinyObjectMaterial;
@@ -114,11 +122,6 @@
             );
 
             // 6. Geometries, Meshes, and Static Positioning
-            // Jika tidak ada orbit, kita bisa langsung posisikan objek
-            // atau tetap menggunakan grup tapi tidak merotasinya.
-            // Saya akan memodifikasi agar objek langsung ditambahkan ke scene pada posisi absolutnya.
-
-            // PLANE (LANTAI) - Statis
             const planeSize = 30;
             const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
             plane = new THREE.Mesh(planeGeometry, new THREE.MeshStandardMaterial({ color: 0x666666, side: THREE.DoubleSide }));
@@ -127,35 +130,31 @@
             plane.receiveShadow = true;
             scene.add(plane);
 
-            const objectYLevel = 2.5; // Ketinggian objek dari lantai
+            const objectYLevel = 2.5;
 
-            // KUBUS (EMISSIVE) - Posisi statis
             const cubeSideLength = 1.8;
             const cubeGeometry = new THREE.BoxGeometry(cubeSideLength, cubeSideLength, cubeSideLength);
             cube = new THREE.Mesh(cubeGeometry, new THREE.MeshBasicMaterial({ color: 0xff8800 }));
-            cube.position.set(-4.5, objectYLevel + cubeSideLength / 2, 0); // Posisi absolut
-            // cube.castShadow = true; // MeshBasicMaterial biasanya tidak efektif untuk castShadow
+            cube.position.set(-4.5, objectYLevel + cubeSideLength / 2, 0);
+            cube.castShadow = true;
             scene.add(cube);
 
-            // BOLA (SHINY) - Posisi statis
             const sphereRadius = 1.5;
             const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 64, 32);
             sphere = new THREE.Mesh(sphereGeometry, new THREE.MeshStandardMaterial({ color: 0x808080 }));
-            sphere.position.set(0, objectYLevel + sphereRadius, 0); // Posisi absolut
+            sphere.position.set(0, objectYLevel + sphereRadius, 0);
             sphere.castShadow = true;
             sphere.receiveShadow = true;
             scene.add(sphere);
 
-            // PIRAMIDA (SHINY) - Posisi statis
             const pyramidBaseRadius = 1.2;
             const pyramidHeight = 2.5;
             const pyramidGeometry = new THREE.ConeGeometry(pyramidBaseRadius, pyramidHeight, 4);
             pyramid = new THREE.Mesh(pyramidGeometry, new THREE.MeshStandardMaterial({ color: 0x808080 }));
-            pyramid.position.set(4.5, objectYLevel + pyramidHeight / 2, 0); // Posisi absolut
+            pyramid.position.set(4.5, objectYLevel + pyramidHeight / 2, 0);
             pyramid.castShadow = true;
             pyramid.receiveShadow = true;
             scene.add(pyramid);
-
 
             // 7. Lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -180,7 +179,7 @@
             directionalLight.shadow.bias = -0.001;
 
             window.addEventListener('resize', onWindowResize, false);
-            animate(); // Tetap panggil animate untuk OrbitControls dan render loop
+            animate();
         }
 
         function onWindowResize() {
@@ -191,25 +190,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-
-            // === HAPUS ATAU KOMENTARI SEMUA ROTASI GRUP DAN OBJEK ===
-            // const time = Date.now() * 0.0005;
-
-            // if (cubeOrbitGroup) {
-            //     cubeOrbitGroup.rotation.y = time * 0.5;
-            //     if(cube) cube.rotation.y = time * 1.2;
-            // }
-            // if (sphereOrbitGroup) {
-            //     sphereOrbitGroup.rotation.x = time * -0.3;
-            //     sphereOrbitGroup.rotation.y = time * 0.4;
-            //     if(sphere) sphere.rotation.y = time * -1.0;
-            // }
-            // if (pyramidOrbitGroup) {
-            //     pyramidOrbitGroup.rotation.y = time * 0.25 + Math.PI / 2;
-            //     if(pyramid) pyramid.rotation.x = time * 0.8;
-            // }
-
-            controls.update(); // OrbitControls masih memerlukan update
+            controls.update();
             renderer.render(scene, camera);
         }
 
