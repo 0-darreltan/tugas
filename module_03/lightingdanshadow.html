@@ -4,13 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Objek Melayang Tanpa Lighting & Shadow - Three.js</title>
+    <title>Objek Melayang dengan Lighting & Shadow - Three.js</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #202530;
-            /* Warna background bisa disesuaikan agar objek terlihat jelas */
         }
 
         canvas {
@@ -36,17 +35,13 @@
 
         let scene, camera, renderer, controls;
         let plane, cube, sphere, pyramid;
-        let objectBasicMaterial, planeBasicMaterial; // Kita akan gunakan MeshBasicMaterial
+        let sphereEmissiveMaterial, shinyObjectMaterial, planeStandardMaterial;
 
-        const texturePath = "texture.jpeg"; // Pastikan file ini ada atau gunakan URL
-        // Contoh placeholder jika texture.jpeg tidak ada:
-        // const texturePath = "https://threejs.org/examples/textures/uv_grid_opengl.jpg";
-
+        const texturePath = "texture.jpeg";
 
         function init() {
             // 1. Scene
             scene = new THREE.Scene();
-            // scene.background = new THREE.Color(0xffffff); // Opsional: background terang agar objek lebih terlihat
 
             // 2. Camera
             const fov = 50;
@@ -54,16 +49,16 @@
             const near = 0.1;
             const far = 1000;
             camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-            camera.position.set(0, 8, 18);
+            camera.position.set(0, 8, 18); // Sedikit lebih jauh dan tinggi untuk melihat bayangan
             camera.lookAt(0, 1, 0);
 
             // 3. Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            // === SHADOW MAP DINONAKTIFKAN ===
-            // renderer.shadowMap.enabled = true;
-            // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            // === AKTIFKAN SHADOW MAP ===
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Bayangan lebih halus
             document.body.appendChild(renderer.domElement);
 
             // 4. Controls
@@ -78,58 +73,49 @@
                 texturePath,
                 function (loadedTexture) {
                     console.log("Tekstur BERHASIL dimuat.");
-                    // Untuk MeshBasicMaterial, ClampToEdgeWrapping biasanya sudah cukup
                     loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
                     loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-                    loadedTexture.needsUpdate = true;
 
-                    // Material untuk Kubus, Bola, dan Piramida
-                    objectBasicMaterial = new THREE.MeshBasicMaterial({
-                        map: loadedTexture.clone() // Clone agar bisa dimodifikasi terpisah jika perlu
+                    const commonTextureProperties = { needsUpdate: true };
+
+                    sphereEmissiveMaterial = new THREE.MeshBasicMaterial({ map: Object.assign(loadedTexture.clone(), commonTextureProperties) });
+                    if (sphere) sphere.material = sphereEmissiveMaterial;
+
+                    shinyObjectMaterial = new THREE.MeshStandardMaterial({
+                        map: Object.assign(loadedTexture.clone(), commonTextureProperties),
+                        metalness: 0.7,
+                        roughness: 0.35,
                     });
-                    objectBasicMaterial.map.needsUpdate = true;
+                    if (cube) cube.material = shinyObjectMaterial;
+                    if (pyramid) pyramid.material = shinyObjectMaterial;
 
-                    if (sphere) sphere.material = objectBasicMaterial;
-                    if (cube) cube.material = objectBasicMaterial;
-                    if (pyramid) pyramid.material = objectBasicMaterial;
-
-                    // Material untuk Plane
-                    const planeTexture = loadedTexture.clone();
+                    planeStandardMaterial = new THREE.MeshStandardMaterial({
+                        map: Object.assign(loadedTexture.clone(), commonTextureProperties), // Tetap 1x1 untuk plane
+                        metalness: 0.1,
+                        roughness: 0.8,
+                    });
                     // Jika ingin plane mengulang tekstur:
-                    // planeTexture.wrapS = THREE.RepeatWrapping;
-                    // planeTexture.wrapT = THREE.RepeatWrapping;
-                    // planeTexture.repeat.set(10, 10);
-                    // planeTexture.needsUpdate = true;
-
-                    planeBasicMaterial = new THREE.MeshBasicMaterial({
-                        map: planeTexture,
-                        side: THREE.DoubleSide // Agar terlihat dari bawah juga jika kamera bergerak
-                    });
-                    if (plane) plane.material = planeBasicMaterial;
-
-                    console.log("Material Basic diterapkan.");
+                    // planeStandardMaterial.map.wrapS = THREE.RepeatWrapping;
+                    // planeStandardMaterial.map.wrapT = THREE.RepeatWrapping;
+                    // planeStandardMaterial.map.repeat.set(10, 10); // Sesuaikan angka repeat
+                    if (plane) plane.material = planeStandardMaterial;
                 },
                 (xhr) => console.log(`Tekstur: ${(xhr.loaded / xhr.total * 100)}% loaded`),
                 (error) => {
                     console.error("Gagal memuat tekstur:", error);
-                    // Fallback jika tekstur gagal, objek akan menggunakan warna material placeholder
-                    if (sphere) sphere.material.color.set(0xff00ff);
-                    if (cube) cube.material.color.set(0x00ff00);
-                    if (pyramid) pyramid.material.color.set(0x0000ff);
-                    if (plane) plane.material.color.set(0x888888);
+                    // Fallback
                 }
             );
 
-            // 6. Geometries and Meshes (dengan material placeholder awal)
+            // 6. Geometries and Meshes
 
             // PLANE (LANTAI)
             const planeSize = 30;
             const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
-            // Material placeholder awal
-            plane = new THREE.Mesh(planeGeometry, new THREE.MeshBasicMaterial({ color: 0x666666, side: THREE.DoubleSide, wireframe: true }));
+            plane = new THREE.Mesh(planeGeometry, new THREE.MeshStandardMaterial({ color: 0x666666, side: THREE.DoubleSide }));
             plane.rotation.x = -Math.PI / 2;
             plane.position.y = 0;
-            // plane.receiveShadow = true; // Tidak relevan lagi
+            plane.receiveShadow = true; // === PLANE MENERIMA BAYANGAN ===
             scene.add(plane);
 
             const floatingHeightBase = 2.5;
@@ -137,54 +123,57 @@
             // KUBUS
             const cubeSideLength = 1.8;
             const cubeGeometry = new THREE.BoxGeometry(cubeSideLength, cubeSideLength, cubeSideLength);
-            cube = new THREE.Mesh(cubeGeometry, new THREE.MeshBasicMaterial({ color: 0x808080, wireframe: true }));
+            cube = new THREE.Mesh(cubeGeometry, new THREE.MeshStandardMaterial({ color: 0x808080 }));
             cube.position.set(-4, floatingHeightBase + cubeSideLength / 2, 0);
-            // cube.castShadow = true;    // Tidak relevan lagi
-            // cube.receiveShadow = true; // Tidak relevan lagi
+            cube.castShadow = true;    // === KUBUS MELEMPAR BAYANGAN ===
+            cube.receiveShadow = true; // Kubus juga bisa menerima bayangan dari objek lain
             scene.add(cube);
 
             // BOLA
             const sphereRadius = 1.5;
             const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 64, 32);
-            sphere = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0xff00cc, wireframe: true }));
+            sphere = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0xff00cc }));
             sphere.position.set(0, floatingHeightBase + sphereRadius, 0);
-            // sphere.castShadow = true;    // Tidak relevan lagi
-            // sphere.receiveShadow = true; // Tidak relevan lagi
+            sphere.castShadow = true;    // === BOLA MELEMPAR BAYANGAN ===
+            sphere.receiveShadow = true;
             scene.add(sphere);
 
             // PIRAMIDA
             const pyramidBaseRadius = 1.2;
             const pyramidHeight = 2.5;
             const pyramidGeometry = new THREE.ConeGeometry(pyramidBaseRadius, pyramidHeight, 4);
-            pyramid = new THREE.Mesh(pyramidGeometry, new THREE.MeshBasicMaterial({ color: 0x808080, wireframe: true }));
+            pyramid = new THREE.Mesh(pyramidGeometry, new THREE.MeshStandardMaterial({ color: 0x808080 }));
             pyramid.position.set(4, floatingHeightBase + pyramidHeight / 2, 0);
-            // pyramid.castShadow = true;    // Tidak relevan lagi
-            // pyramid.receiveShadow = true; // Tidak relevan lagi
+            pyramid.castShadow = true;    // === PIRAMIDA MELEMPAR BAYANGAN ===
+            pyramid.receiveShadow = true;
             scene.add(pyramid);
 
-            // 7. Lights (SEMUA DIHAPUS/DIKOMENTARI)
-            // const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            // scene.add(ambientLight);
+            // 7. Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Turunkan ambient agar bayangan lebih kontras
+            scene.add(ambientLight);
 
-            // const hemisphereLight = new THREE.HemisphereLight(0xaaaaff, 0x443322, 0.4);
-            // hemisphereLight.position.set(0, 20, 0);
-            // scene.add(hemisphereLight);
+            const hemisphereLight = new THREE.HemisphereLight(0xaaaaff, 0x443322, 0.4); // Turunkan juga
+            hemisphereLight.position.set(0, 20, 0);
+            scene.add(hemisphereLight);
 
-            // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            // directionalLight.position.set(10, 15, 10);
-            // directionalLight.castShadow = true;
-            // scene.add(directionalLight);
+            // DIRECTIONALLIGHT YANG MELEMPAR BAYANGAN
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Intensitas bisa disesuaikan
+            directionalLight.position.set(10, 15, 10); // Sesuaikan posisi untuk arah bayangan yang diinginkan
+            directionalLight.castShadow = true; // === CAHAYA INI MELEMPAR BAYANGAN ===
+            scene.add(directionalLight);
 
-            // directionalLight.shadow.mapSize.width = 2048;
-            // directionalLight.shadow.mapSize.height = 2048;
-            // directionalLight.shadow.camera.near = 0.5;
-            // directionalLight.shadow.camera.far = 50;
-            // directionalLight.shadow.camera.left = -15;
-            // directionalLight.shadow.camera.right = 15;
-            // directionalLight.shadow.camera.top = 15;
-            // directionalLight.shadow.camera.bottom = -15;
-            // directionalLight.shadow.bias = -0.001;
+            // Konfigurasi Shadow Map untuk DirectionalLight (PENTING untuk kualitas)
+            directionalLight.shadow.mapSize.width = 2048; // Default 512
+            directionalLight.shadow.mapSize.height = 2048; // Default 512
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -15; // Sesuaikan area yang dicakup kamera bayangan
+            directionalLight.shadow.camera.right = 15;
+            directionalLight.shadow.camera.top = 15;
+            directionalLight.shadow.camera.bottom = -15;
+            directionalLight.shadow.bias = -0.001; // Untuk mengurangi shadow acne (garis-garis pada bayangan)
 
+            // Opsional: Helper untuk melihat frustum kamera bayangan
             // const shadowCamHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
             // scene.add(shadowCamHelper);
             // const dirLightHelper = new THREE.DirectionalLightHelper(directionalLight, 1);
@@ -206,46 +195,7 @@
             renderer.render(scene, camera);
         }
 
-        // Fungsi placeholder texture jika 'texture.jpeg' tidak ada (opsional, untuk testing)
-        function createPlaceholderTexture(callback) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 128;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#' + (Math.random() * 0xFFFFFF << 0).toString(16); // Warna random
-            ctx.fillRect(0, 0, 128, 128);
-            ctx.fillStyle = 'white'; ctx.font = '16px Arial';
-            ctx.textAlign = 'center'; ctx.fillText('Tekstur', 64, 64);
-            callback(canvas.toDataURL());
-        }
-
-        // Cek jika texturePath adalah "texture.jpeg" dan mungkin tidak ada
-        if (texturePath === "texture.jpeg") {
-            // Untuk memastikan kode berjalan meskipun texture.jpeg tidak ada,
-            // Anda bisa meng-uncomment baris berikut untuk menggunakan Data URL placeholder
-            // Saya akan membuatnya otomatis agar kode langsung jalan jika 'texture.jpeg' tidak ditemukan
-            const img = new Image();
-            img.src = texturePath;
-            img.onerror = () => {
-                console.warn("File 'texture.jpeg' tidak ditemukan. Menggunakan placeholder texture data URL.");
-                createPlaceholderTexture(function (dataUrl) {
-                    const manager = new THREE.LoadingManager();
-                    manager.setURLModifier((url) => {
-                        if (url === "texture.jpeg") return dataUrl;
-                        return url;
-                    });
-                    const originalTextureLoader = THREE.DefaultLoadingManager;
-                    THREE.DefaultLoadingManager = manager;
-                    init();
-                    THREE.DefaultLoadingManager = originalTextureLoader;
-                });
-            };
-            img.onload = () => { // Jika texture.jpeg ada
-                init();
-            }
-        } else {
-            init(); // Jika texturePath sudah URL atau file yang pasti ada
-        }
-
+        init();
     </script>
 
 </body>
